@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Battery 50%: black "empty" disc, blue fill rising to the half-way line. -->
+  <defs>
+    <clipPath id="fill50">
+      <!-- waterline = 62 - 60 * 50/100 = 32 -->
+      <rect x="0" y="32" width="64" height="32"/>
+    </clipPath>
+  </defs>
+  <circle cx="32" cy="32" r="30" fill="#000000"/>
+  <circle cx="32" cy="32" r="30" fill="#2196F3" clip-path="url(#fill50)"/>
+  <circle cx="32" cy="32" r="30" fill="none" stroke="#2196F3" stroke-width="2.5"/>
+  <polyline points="22,24 42,42 32,50 32,14 42,24 22,42"
+            fill="none" stroke="#ffffff" stroke-width="4"
+            stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

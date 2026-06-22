@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Bluetooth Headphones Manager
+GenericName=Bluetooth Headphones Manager
+Comment=Pair, trust and connect Bluetooth audio devices from the system tray
+Exec=/usr/bin/bluetooth-headphones-manager
+Icon=bluetooth-headphones-manager
+Terminal=false
+Categories=AudioVideo;Audio;
+Keywords=bluetooth;bluetooth manager;headphones;headset;earbuds;speakers;audio;bluez;
+StartupNotify=false

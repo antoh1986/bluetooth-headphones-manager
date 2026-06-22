@@ -1,0 +1,17 @@
+# CMake build output and generated packages
+/build/
+/*.deb
+
+# CMake and IDE user-specific files
+CMakeUserPresets.json
+compile_commands.json
+*.user
+*.user.*
+/.vscode/
+/.idea/
+
+# Editor and operating-system noise
+*~
+*.swp
+.DS_Store
+

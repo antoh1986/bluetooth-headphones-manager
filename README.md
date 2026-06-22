@@ -1,0 +1,197 @@
+<h1 align="center">🎧 Bluetooth Headphones Manager</h1>
+
+<p align="center">
+  <strong>One-click Bluetooth audio device manager and system tray app for Linux Mint/Cinnamon, built with Qt 5 and BlueZ D-Bus.</strong>
+</p>
+
+<p align="center">
+  Click a device once to pair, trust and connect it automatically — an Android-like Bluetooth experience for the Linux desktop.
+</p>
+
+<p align="center">
+  <img alt="Platform" src="https://img.shields.io/badge/platform-Linux%20Mint%20%2F%20Cinnamon-87CF3E">
+  <img alt="Qt" src="https://img.shields.io/badge/Qt-5.15-41CD52?logo=qt&logoColor=white">
+  <img alt="C++" src="https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus&logoColor=white">
+  <img alt="BlueZ" src="https://img.shields.io/badge/BlueZ-D--Bus-0082FC?logo=bluetooth&logoColor=white">
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-blue">
+</p>
+
+## About
+
+**Bluetooth Headphones Manager** is a lightweight Bluetooth manager focused on
+headphones, headsets, earbuds, speakers and other Bluetooth audio devices. It
+lives in the system tray and replaces the usual *pair → trust → connect* dance
+with a single click.
+
+The application communicates directly with **BlueZ over the system D-Bus**
+through Qt's `QtDBus` module. It never shells out to `bluetoothctl`, never
+polls command output, and keeps the interface synchronized through BlueZ
+signals.
+
+## Features
+
+- **One-click connection** — pairs, trusts and connects a Bluetooth audio device automatically.
+- **Seamless switching** — disconnects the active device before connecting another one.
+- **System-tray status** — shows the connected device, connection state and battery level.
+- **At-a-glance battery icon** — the tray icon visually reflects the connected device's current charge level.
+- **Audio-first lists** — separates paired and available devices, with audio hardware shown first.
+- **Live progress** — displays pairing, connecting, connected and failure states as they happen.
+- **Windowed discovery** — scans while Settings is open, stops automatically and supports manual refresh.
+- **Disconnect notifications** — warns about unexpected drops without noisy notifications for intentional disconnects.
+- **Launch on startup** — starts minimized in the tray after login and can be disabled in Settings.
+- **Device information** — shows selectable device details and a one-click copy button for the Bluetooth MAC address.
+
+## Screenshot
+
+<p align="center">
+  <img src="docs/images/settings.png" alt="Bluetooth Headphones Manager settings window" width="440">
+  &nbsp;&nbsp;
+  <img src="docs/images/info.png" alt="Bluetooth Headphones Manager device information dialog" width="440">
+</p>
+
+## Tray icon
+
+The system-tray icon doubles as a battery gauge for the connected device. The
+disc is drawn as an "empty" black circle that fills with blue from the bottom
+up, in proportion to the reported charge — so the icon goes solid blue at
+**100 %** and shows progressively more black as the battery drains. A thin blue
+ring keeps the circle readable even on dark panels, and the white Bluetooth rune
+stays on top at every level.
+
+<p align="center">
+  <img src="docs/images/tray-battery-100.svg" alt="Tray icon at 100% battery (solid blue)" width="72">
+  &nbsp;&nbsp;&nbsp;
+  <img src="docs/images/tray-battery-50.svg" alt="Tray icon at 50% battery (bottom half blue)" width="72">
+  &nbsp;&nbsp;&nbsp;
+  <img src="docs/images/tray-battery-15.svg" alt="Tray icon at 15% battery (mostly black)" width="72">
+</p>
+
+<p align="center">
+  <em>100 % &nbsp;·&nbsp; 50 % &nbsp;·&nbsp; 15 %</em>
+</p>
+
+When no device is connected the icon is a flat grey disc, and when a device is
+connected but does not report a battery level it stays solid blue.
+
+## Requirements
+
+To install and run the prebuilt package you only need:
+
+- Linux Mint with the Cinnamon desktop
+- BlueZ running on the system bus
+- x86-64 for the provided Debian package
+
+The Qt 5 runtime libraries the application links against (Core, Gui, Widgets,
+DBus and Network) are pulled in automatically by `apt` when you install the
+`.deb`, so you do not need to set up Qt yourself.
+
+
+## Installation
+
+### Install the prebuilt `.deb` (recommended)
+
+Download the package from the
+[latest release](https://github.com/antoh1986/bluetooth-headphones-manager/releases/latest),
+then double-click it or install it from a terminal:
+
+```bash
+sudo apt install ./bluetooth-headphones-manager_*_amd64.deb
+```
+
+You can also download and install it in one go:
+
+```bash
+url=$(wget -qO- https://api.github.com/repos/antoh1986/bluetooth-headphones-manager/releases/latest \
+  | grep -oE 'https://[^"]*_amd64\.deb' | head -n1)
+wget -O bluetooth-headphones-manager_latest_amd64.deb "$url"
+sudo apt install ./bluetooth-headphones-manager_latest_amd64.deb
+```
+
+After installation, **Bluetooth Headphones Manager** appears in the application
+menu under **Sound & Video** and starts minimized in the tray on the
+next login. You can also launch it directly with
+`bluetooth-headphones-manager`.
+
+
+### Build the `.deb` from source
+
+```bash
+sudo apt install -y build-essential cmake qtbase5-dev libqt5svg5-dev
+
+git clone https://github.com/antoh1986/bluetooth-headphones-manager.git
+cd bluetooth-headphones-manager
+./build_deb.sh
+
+sudo apt install ./bluetooth-headphones-manager_*_amd64.deb
+```
+
+The packaging script builds the application and creates an installable Debian
+package in the repository root.
+
+
+## Build dependencies
+
+These are only needed to **build** the application from source:
+
+- Qt 5.15 development libraries: Core, Gui, Widgets, DBus and Network
+- GCC with C++17 support
+- CMake 3.16 or newer
+
+
+## Usage
+
+- Left-click the tray icon, or choose **Settings**, to open the device list.
+- Click a device to connect. New devices are paired, trusted and connected automatically.
+- Use the device actions menu to view device information, copy its MAC address, disconnect or forget it.
+- Use **Refresh** to restart Bluetooth discovery.
+- Toggle **Launch on startup** to control autostart.
+- Choose **Quit** from the tray menu to exit completely.
+
+## Building without packaging
+
+```bash
+sudo apt install -y build-essential cmake qtbase5-dev libqt5svg5-dev
+
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+
+./build/bluetooth-headphones-manager             # open the settings window
+./build/bluetooth-headphones-manager --minimized # start hidden in the system tray
+```
+
+## Uninstalling
+
+Remove only the Debian package:
+
+```bash
+sudo apt remove bluetooth-headphones-manager
+```
+
+Or run the idempotent cleanup script from the source directory to purge the
+package and remove the current user's settings, autostart override, logs and
+runtime socket:
+
+```bash
+./uninstall.sh
+```
+
+The cleanup script does not delete the source tree, build directory or generated
+`.deb` files.
+
+## Log file
+
+Runtime activity and Bluetooth pairing or connection errors are written to:
+
+```text
+~/.local/share/bluetooth-headphones-manager/bluetooth-headphones-manager.log
+```
+
+## Contributing
+
+Bug reports, feature suggestions and pull requests are welcome. Please keep the
+application compatible with Qt 5.15, C++17 and BlueZ D-Bus, and verify changes
+with a warning-free release build.
+
+## License
+
+Released under the [MIT License](LICENSE).

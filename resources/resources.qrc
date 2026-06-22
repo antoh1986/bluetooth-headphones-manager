@@ -1,0 +1,8 @@
+<RCC>
+  <qresource prefix="/icons">
+    <file alias="bt-connected.svg">icons/bt-connected.svg</file>
+    <file alias="bt-disconnected.svg">icons/bt-disconnected.svg</file>
+    <file alias="bluetooth-headphones-manager.svg">icons/bluetooth-headphones-manager.svg</file>
+    <file alias="audio.svg">icons/audio.svg</file>
+  </qresource>
+</RCC>

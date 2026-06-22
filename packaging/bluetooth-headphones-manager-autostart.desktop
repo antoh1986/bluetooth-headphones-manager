@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Bluetooth Headphones Manager
+Comment=One-click Bluetooth audio device manager for Linux
+Exec=/usr/bin/bluetooth-headphones-manager --minimized
+Icon=bluetooth-headphones-manager
+Terminal=false
+X-GNOME-Autostart-enabled=true
