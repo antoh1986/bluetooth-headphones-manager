@@ -9,6 +9,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/antoh1986/bluetooth-headphones-manager/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/antoh1986/bluetooth-headphones-manager?label=release&color=blue"></a>
   <img alt="Platform" src="https://img.shields.io/badge/platform-Linux%20Mint%20%2F%20Cinnamon-87CF3E">
   <img alt="Qt" src="https://img.shields.io/badge/Qt-5.15-41CD52?logo=qt&logoColor=white">
   <img alt="C++" src="https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus&logoColor=white">
