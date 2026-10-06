@@ -5,22 +5,22 @@ Guidance for working in this repository.
 ## Project
 
 **Bluetooth Headphones Manager** — a one-click Bluetooth audio device manager
-and system-tray app for **Linux Mint / Cinnamon**, built with Qt 5 and BlueZ
-D-Bus. It pairs, trusts and connects Bluetooth audio devices with an
-"Android-like" UX. All Bluetooth control goes through **BlueZ over D-Bus
-(system bus)** using Qt's `QtDBus` module.
+and system-tray app for **Linux Mint / Cinnamon** and **LXQt**, built with
+Qt 6 and BlueZ D-Bus. It pairs, trusts and connects Bluetooth audio devices
+with an "Android-like" UX. All Bluetooth control goes through **BlueZ over
+D-Bus (system bus)** using Qt's `QtDBus` module.
 
 ## Public repository metadata
 
 - **Display name:** `Bluetooth Headphones Manager`
 - **GitHub repository slug:** `bluetooth-headphones-manager`
-- **GitHub description:** `One-click Bluetooth audio device manager and system tray app for Linux Mint/Cinnamon, built with Qt 5 and BlueZ D-Bus.`
+- **GitHub description:** `One-click Bluetooth audio device manager and system tray app for Linux Mint/Cinnamon and LXQt, built with Qt 6 and BlueZ D-Bus.`
 - **GitHub topics:** `bluetooth`, `bluetooth-manager`, `bluetooth-headphones`,
-  `bluez`, `linux`, `linux-mint`, `cinnamon`, `qt`, `qt5`, `cpp`, `cpp17`,
-  `dbus`, `audio`, `headphones`, `system-tray`
-- Keep the public name and the Bluetooth/BlueZ/Linux search terms near the top
-  of `README.md`. GitHub topics are repository settings and must be applied in
-  the GitHub UI (or API) after the repository is created.
+  `bluez`, `linux`, `linux-mint`, `cinnamon`, `lxqt`, `qt`, `qt6`, `cpp`,
+  `cpp17`, `dbus`, `audio`, `headphones`, `system-tray`
+- Keep the public name and the Bluetooth/BlueZ/Linux/Cinnamon/LXQt search
+  terms near the top of `README.md`. GitHub topics are repository settings and
+  must be applied in the GitHub UI (or API) after the repository is created.
 - Use the canonical identifier `bluetooth-headphones-manager` consistently for
   the checkout directory, CMake project and target, executable, Debian package,
   desktop/autostart files, application ID, icon, settings, logs and
@@ -28,7 +28,17 @@ D-Bus. It pairs, trusts and connects Bluetooth audio devices with an
 
 ## Hard constraints (do not violate)
 
-- **Target toolchain:** Qt 5.15, C++17, GCC, x86-64. Keep it building there.
+- **Target toolchain:** Qt 6 (minimum **6.2**, the Qt of Ubuntu 22.04 / Mint
+  21 that CI builds the release `.deb` against), C++17, GCC, x86-64. Keep it
+  building there: don't use Qt APIs newer than 6.2 without a version guard.
+  Qt 5 is no longer supported.
+- **Qt licensing (LGPLv3).** Qt is used under the LGPL v3. Always link it
+  dynamically from the distribution's packages; never link statically or
+  bundle Qt libraries/plugins into the `.deb` (that would add source-offer and
+  relinking obligations). `build_deb.sh` ships the required notice in
+  `/usr/share/doc/bluetooth-headphones-manager/copyright` and refuses to package
+  a binary that carries an RPATH/RUNPATH. Don't add GPL-only Qt modules (e.g.
+  Qt Charts) — they would force the app off MIT.
 - **Prefer D-Bus.** Use native `QtDBus` against `org.bluez` for Bluetooth
   control. Shelling out (e.g. `rfkill` for a kernel-level adapter reset) is
   permitted where D-Bus has no clean equivalent, but avoid commands that need
@@ -55,7 +65,11 @@ cmake --build build --parallel
 ./build/bluetooth-headphones-manager             # opens settings window
 ./build/bluetooth-headphones-manager --minimized # starts hidden in the tray
 
-# Package (.deb) — also runs the CMake build
+# Qt 6 dev files outside the default prefix (not installed via apt)?
+# CMake reads the environment variable for both commands above and below:
+#   CMAKE_PREFIX_PATH=/path/to/qt6/usr cmake -S . -B build ...
+
+# Package (.deb) — also runs the CMake build (with RPATH disabled)
 ./build_deb.sh
 ./build_deb.sh clean              # remove build/ and *.deb
 
@@ -109,8 +123,11 @@ There are no automated tests; verify by building warning-free (`-Wall
 - **Modules:** Core, Gui, Widgets, DBus, **Network** (Network only for the
   single-instance `QLocalServer`). Reflect any module change in both
   `CMakeLists.txt` and the `.deb` `Depends`.
-- **`.deb` dependencies** list classic Qt5 names with `*t64` alternatives
-  (e.g. `libqt5core5a | libqt5core5t64`) for old and new Mint/Ubuntu.
+- **`.deb` dependencies** list classic Qt6 names with `*t64` alternatives
+  (e.g. `libqt6core6 | libqt6core6t64`) for old and new Mint/Ubuntu/Debian,
+  plus `libqt6svg6` (SVG icon engine plugin, loaded at runtime) and
+  `qt6-qpa-plugins` (Debian splits the xcb platform plugin out of
+  `libqt6gui6`; without it the app cannot start).
 
 ## Extension points
 

@@ -19,6 +19,9 @@ permissions:
 
 jobs:
   build-and-release:
+    # Ubuntu 22.04 ships Qt 6.2, the oldest Qt 6 we support. Building against
+    # it yields a binary that also runs on every newer Qt 6 (Mint 22 / Ubuntu
+    # 24.04 with 6.4, Debian 13 with 6.8, ...), never the other way round.
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
@@ -29,7 +32,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             build-essential cmake \
-            qtbase5-dev qtbase5-dev-tools libqt5svg5-dev \
+            qt6-base-dev \
             fakeroot
 
       - name: Set package version from tag

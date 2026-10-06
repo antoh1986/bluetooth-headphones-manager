@@ -1,7 +1,7 @@
 <h1 align="center">🎧 Bluetooth Headphones Manager</h1>
 
 <p align="center">
-  <strong>One-click Bluetooth audio device manager and system tray app for Linux Mint/Cinnamon, built with Qt 5 and BlueZ D-Bus.</strong>
+  <strong>One-click Bluetooth audio device manager and system tray app for Linux Mint/Cinnamon and LXQt, built with Qt 6 and BlueZ D-Bus.</strong>
 </p>
 
 <p align="center">
@@ -10,8 +10,9 @@
 
 <p align="center">
   <a href="https://github.com/antoh1986/bluetooth-headphones-manager/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/antoh1986/bluetooth-headphones-manager?label=release&color=blue"></a>
-  <img alt="Platform" src="https://img.shields.io/badge/platform-Linux%20Mint%20%2F%20Cinnamon-87CF3E">
-  <img alt="Qt" src="https://img.shields.io/badge/Qt-5.15-41CD52?logo=qt&logoColor=white">
+  <img alt="Platform" src="https://img.shields.io/badge/platform-Linux%20Mint%20%7C%20Ubuntu%20%7C%20Debian-87CF3E">
+  <img alt="Desktop" src="https://img.shields.io/badge/desktop-Cinnamon%20%7C%20LXQt-0192D3">
+  <img alt="Qt" src="https://img.shields.io/badge/Qt-6-41CD52?logo=qt&logoColor=white">
   <img alt="C++" src="https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus&logoColor=white">
   <img alt="BlueZ" src="https://img.shields.io/badge/BlueZ-D--Bus-0082FC?logo=bluetooth&logoColor=white">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-blue">
@@ -23,6 +24,10 @@
 headphones, headsets, earbuds, speakers and other Bluetooth audio devices. It
 lives in the system tray and replaces the usual *pair → trust → connect* dance
 with a single click.
+
+Being a native **Qt 6** application, it fits right into the **LXQt** desktop
+(including LXQt 2.x) as well as Linux Mint's **Cinnamon**, and works with any
+other desktop that provides a system tray.
 
 The application communicates directly with **BlueZ over the system D-Bus**
 through Qt's `QtDBus` module. It never shells out to `bluetoothctl`, never
@@ -41,6 +46,18 @@ signals.
 - **Disconnect notifications** — warns about unexpected drops without noisy notifications for intentional disconnects.
 - **Launch on startup** — starts minimized in the tray after login and can be disabled in Settings.
 - **Device information** — shows selectable device details and a one-click copy button for the Bluetooth MAC address.
+
+## Supported desktops
+
+| Desktop | Status |
+|---------|--------|
+| **Cinnamon** (Linux Mint) | Primary target, tested |
+| **LXQt** 2.x (Lubuntu, Debian and other LXQt setups) | Supported — native Qt 6 app, tray icon via StatusNotifierItem |
+| Other desktops with a system tray (MATE, Xfce, KDE Plasma, …) | Should work |
+
+Feedback from LXQt and other desktops is welcome — please
+[open an issue](https://github.com/antoh1986/bluetooth-headphones-manager/issues)
+if something does not look or behave right.
 
 ## Screenshot
 
@@ -78,13 +95,17 @@ connected but does not report a battery level it stays solid blue.
 
 To install and run the prebuilt package you only need:
 
-- Linux Mint with the Cinnamon desktop
+- A desktop with a system tray: Cinnamon or LXQt (see
+  [Supported desktops](#supported-desktops))
+- A distribution that ships Qt 6.2 or newer: Linux Mint 21+, LMDE 6+,
+  Ubuntu 22.04+ or Debian 12+
 - BlueZ running on the system bus
 - x86-64 for the provided Debian package
 
-The Qt 5 runtime libraries the application links against (Core, Gui, Widgets,
-DBus and Network) are pulled in automatically by `apt` when you install the
-`.deb`, so you do not need to set up Qt yourself.
+The Qt 6 runtime libraries the application links against (Core, Gui, Widgets,
+DBus and Network) are pulled in automatically by `apt` from your
+distribution's repositories when you install the `.deb`, so you do not need to
+set up Qt yourself.
 
 
 ## Installation
@@ -117,7 +138,7 @@ next login. You can also launch it directly with
 ### Build the `.deb` from source
 
 ```bash
-sudo apt install -y build-essential cmake qtbase5-dev libqt5svg5-dev
+sudo apt install -y build-essential cmake qt6-base-dev
 
 git clone https://github.com/antoh1986/bluetooth-headphones-manager.git
 cd bluetooth-headphones-manager
@@ -134,9 +155,13 @@ package in the repository root.
 
 These are only needed to **build** the application from source:
 
-- Qt 5.15 development libraries: Core, Gui, Widgets, DBus and Network
+- Qt 6.2 or newer development libraries: Core, Gui, Widgets, DBus and Network
+  (the `qt6-base-dev` package)
 - GCC with C++17 support
 - CMake 3.16 or newer
+
+If Qt 6 is installed outside the default search path, point CMake at it with
+`CMAKE_PREFIX_PATH`, e.g. `CMAKE_PREFIX_PATH=/opt/qt6 ./build_deb.sh`.
 
 
 ## Usage
@@ -151,7 +176,7 @@ These are only needed to **build** the application from source:
 ## Building without packaging
 
 ```bash
-sudo apt install -y build-essential cmake qtbase5-dev libqt5svg5-dev
+sudo apt install -y build-essential cmake qt6-base-dev
 
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
@@ -190,9 +215,21 @@ Runtime activity and Bluetooth pairing or connection errors are written to:
 ## Contributing
 
 Bug reports, feature suggestions and pull requests are welcome. Please keep the
-application compatible with Qt 5.15, C++17 and BlueZ D-Bus, and verify changes
+application compatible with Qt 6.2+, C++17 and BlueZ D-Bus, and verify changes
 with a warning-free release build.
 
 ## License
 
 Released under the [MIT License](LICENSE).
+
+### Third-party software
+
+Bluetooth Headphones Manager is built with [Qt 6](https://www.qt.io/) (Qt Core,
+Qt Gui, Qt Widgets, Qt D-Bus, Qt Network and the Qt SVG icon plugin), which is
+used under the terms of the
+[GNU Lesser General Public License v3](https://www.gnu.org/licenses/lgpl-3.0.html).
+Qt is not bundled with this application: the binary links dynamically to the Qt
+libraries provided by your distribution, so they can be updated or replaced
+independently. The Qt source code is available from
+[download.qt.io](https://download.qt.io/) and from your distribution's source
+packages. Qt is a registered trademark of The Qt Company Ltd.

@@ -13,7 +13,7 @@ endif()
 
 project(bluetooth-headphones-manager
     VERSION ${_bhm_version}
-    DESCRIPTION "One-click Bluetooth audio device manager and system tray app for Linux Mint/Cinnamon"
+    DESCRIPTION "One-click Bluetooth audio device manager and system tray app for Linux Mint/Cinnamon and LXQt"
     HOMEPAGE_URL "https://github.com/antoh1986/bluetooth-headphones-manager"
     LANGUAGES CXX)
 
@@ -38,8 +38,10 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
-# Qt 5.15 (Network is needed for the QLocalServer single-instance guard).
-find_package(Qt5 5.15 REQUIRED COMPONENTS Core Gui Widgets DBus Network)
+# Qt 6 (Network is needed for the QLocalServer single-instance guard).
+# 6.2 is the oldest Qt 6 shipped by the supported distros (Ubuntu 22.04 /
+# Linux Mint 21); newer Qt 6 releases run the same binary.
+find_package(Qt6 6.2 REQUIRED COMPONENTS Core Gui Widgets DBus Network)
 
 set(SOURCES
     src/main.cpp
@@ -75,11 +77,11 @@ target_compile_definitions(bluetooth-headphones-manager PRIVATE
     BLUETOOTH_HEADPHONES_MANAGER_VERSION="${PROJECT_VERSION}")
 
 target_link_libraries(bluetooth-headphones-manager PRIVATE
-    Qt5::Core
-    Qt5::Gui
-    Qt5::Widgets
-    Qt5::DBus
-    Qt5::Network
+    Qt6::Core
+    Qt6::Gui
+    Qt6::Widgets
+    Qt6::DBus
+    Qt6::Network
 )
 
 # ---------------------------------------------------------------------------

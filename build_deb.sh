@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 #
 # Build bluetooth-headphones-manager and package it into a .deb installable on
-# Linux Mint / Ubuntu with system Qt 5.15.
+# Linux Mint / Ubuntu / Debian with the distribution's Qt 6 (>= 6.2).
 #
 # Usage:
 #   ./build_deb.sh                # build + package
 #   ./build_deb.sh clean          # remove build artefacts
+#
+# Qt 6 is located through CMake's normal search. If the Qt 6 development files
+# are not installed system-wide (qt6-base-dev), point CMake at another prefix:
+#   CMAKE_PREFIX_PATH=/path/to/qt6/usr ./build_deb.sh
 #
 set -euo pipefail
 
@@ -53,7 +57,10 @@ fi
 JOBS="$(nproc 2>/dev/null || echo 2)"
 
 echo "==> Configuring (CMake, Release)"
-cmake -S "${SCRIPT_DIR}" -B "${BUILD_DIR}" -DCMAKE_BUILD_TYPE=Release
+# No RPATH: the packaged binary must load Qt from the system library path, even
+# when it was built against a Qt prefix outside the default search path.
+cmake -S "${SCRIPT_DIR}" -B "${BUILD_DIR}" -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_SKIP_RPATH=ON
 
 VERSION_FILE="${BUILD_DIR}/project-version.txt"
 if [[ ! -s "${VERSION_FILE}" ]]; then
@@ -75,11 +82,16 @@ rm -rf "${STAGE_DIR}"
 install -d "${STAGE_DIR}/usr/bin"
 install -d "${STAGE_DIR}/usr/share/applications"
 install -d "${STAGE_DIR}/usr/share/icons/hicolor/scalable/apps"
+install -d "${STAGE_DIR}/usr/share/doc/${PKG_NAME}"
 install -d "${STAGE_DIR}/etc/xdg/autostart"
 install -d "${STAGE_DIR}/DEBIAN"
 
 install -m 0755 "${BUILD_DIR}/${PKG_NAME}" \
     "${STAGE_DIR}/usr/bin/${PKG_NAME}"
+if readelf -d "${STAGE_DIR}/usr/bin/${PKG_NAME}" | grep -qE '\((RPATH|RUNPATH)\)'; then
+    echo "Error: packaged binary carries an RPATH/RUNPATH" >&2
+    exit 1
+fi
 install -m 0644 "${SCRIPT_DIR}/packaging/${PKG_NAME}.desktop" \
     "${STAGE_DIR}/usr/share/applications/${PKG_NAME}.desktop"
 install -m 0644 "${SCRIPT_DIR}/resources/icons/${PKG_NAME}.svg" \
@@ -89,6 +101,38 @@ install -m 0644 "${SCRIPT_DIR}/resources/icons/${PKG_NAME}.svg" \
 # (~/.config/autostart/bluetooth-headphones-manager.desktop) can suppress it.
 install -m 0644 "${SCRIPT_DIR}/packaging/${PKG_NAME}-autostart.desktop" \
     "${STAGE_DIR}/etc/xdg/autostart/${PKG_NAME}.desktop"
+
+# Licence notices: the MIT licence of this program, plus the notice that it
+# uses the Qt libraries under the GNU LGPL v3 (LGPLv3 section 3 asks for it
+# with object code that incorporates material from the Qt headers). Qt itself
+# is not shipped: the binary links dynamically to the distribution's Qt
+# packages. Debian-based systems always provide the GPL/LGPL texts in
+# /usr/share/common-licenses.
+COPYRIGHT_FILE="${STAGE_DIR}/usr/share/doc/${PKG_NAME}/copyright"
+cat > "${COPYRIGHT_FILE}" <<EOF
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: ${PKG_NAME}
+Upstream-Contact: ${MAINTAINER}
+Source: https://github.com/antoh1986/bluetooth-headphones-manager
+Comment: This program uses the Qt 6 libraries (Qt Core, Qt Gui, Qt Widgets,
+ Qt D-Bus, Qt Network and the Qt SVG icon plugin), Copyright (C) The Qt
+ Company Ltd. and other contributors, under the terms of the GNU Lesser
+ General Public License version 3. Qt is not included in this package: it is
+ linked dynamically from the distribution's own Qt packages, which can be
+ upgraded or replaced independently. The LGPL v3 text is in
+ /usr/share/common-licenses/LGPL-3 and the GPL v3 text it supplements is in
+ /usr/share/common-licenses/GPL-3. Qt source code is available from
+ https://download.qt.io/ and from the distribution's source packages.
+
+Files: *
+Copyright: $(sed -n 's/^Copyright (c) //p' "${SCRIPT_DIR}/LICENSE")
+License: Expat
+EOF
+# Append the MIT licence text (from "Permission ..." on) in the
+# copyright-format continuation syntax: one leading space, "." for blank lines.
+sed -n '/^Permission/,$p' "${SCRIPT_DIR}/LICENSE" \
+    | sed -e 's/^$/./' -e 's/^/ /' >> "${COPYRIGHT_FILE}"
+chmod 0644 "${COPYRIGHT_FILE}"
 
 # Approximate installed size (KiB) for the control file.
 INSTALLED_SIZE="$(du -sk "${STAGE_DIR}" | cut -f1)"
@@ -103,13 +147,14 @@ Architecture: ${ARCH}
 Maintainer: ${MAINTAINER}
 Installed-Size: ${INSTALLED_SIZE}
 Homepage: https://github.com/antoh1986/bluetooth-headphones-manager
-Depends: libc6, libstdc++6, libqt5core5a | libqt5core5t64, libqt5gui5 | libqt5gui5t64, libqt5widgets5 | libqt5widgets5t64, libqt5dbus5 | libqt5dbus5t64, libqt5network5 | libqt5network5t64, libqt5svg5 | libqt5svg5t64, bluez
+Depends: libc6, libstdc++6, libqt6core6 | libqt6core6t64, libqt6gui6 | libqt6gui6t64, libqt6widgets6 | libqt6widgets6t64, libqt6dbus6 | libqt6dbus6t64, libqt6network6 | libqt6network6t64, libqt6svg6, qt6-qpa-plugins, bluez
 Description: Bluetooth Headphones Manager
- System tray application for Linux Mint / Cinnamon that pairs, trusts and
- connects Bluetooth audio devices with a single click. The tray icon colour
- reflects the connection state, the right-click menu shows the currently
- connected device and its battery level, and a settings window lists paired
- and available devices with audio devices shown first.
+ System tray application for Linux Mint / Cinnamon, LXQt and other Linux
+ desktops that pairs, trusts and connects Bluetooth audio devices with a
+ single click. The tray icon colour reflects the connection state, the
+ right-click menu shows the currently connected device and its battery level,
+ and a settings window lists paired and available devices with audio devices
+ shown first.
 EOF
 
 echo "==> Writing DEBIAN/conffiles"
