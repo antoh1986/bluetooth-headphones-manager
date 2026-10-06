@@ -138,7 +138,7 @@ next login. You can also launch it directly with
 ### Build the `.deb` from source
 
 ```bash
-sudo apt install -y build-essential cmake qt6-base-dev
+sudo apt install -y build-essential cmake qt6-base-dev libgl-dev
 
 git clone https://github.com/antoh1986/bluetooth-headphones-manager.git
 cd bluetooth-headphones-manager
@@ -156,7 +156,8 @@ package in the repository root.
 These are only needed to **build** the application from source:
 
 - Qt 6.2 or newer development libraries: Core, Gui, Widgets, DBus and Network
-  (the `qt6-base-dev` package)
+  (the `qt6-base-dev` package, plus `libgl-dev` for the OpenGL headers that
+  Qt's CMake files require)
 - GCC with C++17 support
 - CMake 3.16 or newer
 
@@ -176,7 +177,7 @@ If Qt 6 is installed outside the default search path, point CMake at it with
 ## Building without packaging
 
 ```bash
-sudo apt install -y build-essential cmake qt6-base-dev
+sudo apt install -y build-essential cmake qt6-base-dev libgl-dev
 
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel

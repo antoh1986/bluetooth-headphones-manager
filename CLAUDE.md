@@ -142,6 +142,10 @@ There are no automated tests; verify by building warning-free (`-Wall
 
 ## Gotchas
 
+- Qt6Gui's CMake config hard-requires the OpenGL headers (`GL/gl.h`, package
+  `libgl-dev`). On Ubuntu 22.04 `qt6-base-dev` does not pull it in, so CI and
+  the README install it explicitly — keep it there.
+
 - `organizationName` and `applicationName` are both
   `bluetooth-headphones-manager`, while `applicationDisplayName` is
   `Bluetooth Headphones Manager`. The matching organization/application IDs
