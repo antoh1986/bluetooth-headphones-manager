@@ -1,0 +1,40 @@
+name: Build
+
+# Build check for branches and pull requests: the same .deb build as
+# release.yml, against Ubuntu 22.04's Qt 6.2 (the oldest Qt 6 we support), but
+# nothing is published. The package is kept as a workflow artifact.
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake \
+            qt6-base-dev libgl-dev \
+            libpulse-dev pkg-config \
+            fakeroot
+
+      - name: Build .deb
+        env:
+          BHM_NO_BUMP: "1"
+        run: ./build_deb.sh
+
+      - name: Upload .deb
+        uses: actions/upload-artifact@v4
+        with:
+          name: bluetooth-headphones-manager-deb
+          path: bluetooth-headphones-manager_*_amd64.deb
+          if-no-files-found: error

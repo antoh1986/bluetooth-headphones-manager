@@ -150,7 +150,7 @@ There are no automated tests; verify by building warning-free (`-Wall
 - **Modules:** Core, Gui, Widgets, DBus, **Network** (Network only for the
   single-instance `QLocalServer`), plus `libpulse` + `libpulse-mainloop-glib`
   via pkg-config. Reflect any module change in both `CMakeLists.txt` and the
-  `.deb` `Depends` (and CI's/README's build packages).
+  `.deb` `Depends` (and the build packages in both CI workflows and the README).
 - **Sound output / profiles:** cards and sinks are matched to a device by
   Bluetooth address (`api.bluez5.address` on PipeWire, `device.string` with
   `device.bus=bluetooth` on PulseAudio). "Plays through the device" means the
