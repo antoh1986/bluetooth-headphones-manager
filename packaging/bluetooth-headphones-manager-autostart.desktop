@@ -6,3 +6,4 @@ Exec=/usr/bin/bluetooth-headphones-manager --minimized
 Icon=bluetooth-headphones-manager
 Terminal=false
 X-GNOME-Autostart-enabled=true
+X-LXQt-Need-Tray=true

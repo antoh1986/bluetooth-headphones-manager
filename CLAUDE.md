@@ -52,7 +52,8 @@ D-Bus (system bus)** using Qt's `QtDBus` module.
   `InterfacesRemoved`, `PropertiesChanged`.
 - **UI language is English.** All user-facing strings in English.
 - **UI ↔ BlueZ only via signals/slots** on `BluezManager`. The UI never makes
-  D-Bus calls directly.
+  D-Bus calls directly. (The one session-bus watch in `TrayApp`, for the
+  tray host appearing, is about the tray, not BlueZ.)
 
 ## Build / run / package
 
@@ -88,18 +89,18 @@ There are no automated tests; verify by building warning-free (`-Wall
 | File | Responsibility |
 |------|----------------|
 | `src/main.cpp` | Entry point: `QApplication` setup, logger init, single-instance guard (`QLocalServer`/`QLocalSocket`), `--minimized`/`--tray` parsing, wires `BluezManager` + `TrayApp`. |
-| `src/BluezManager.{h,cpp}` | The only D-Bus layer. Async wrapper over `org.bluez`. Tracks devices in `QMap<QString path, BtDevice>`. Holds the one-click state machine. Emits `devicesChanged`, `deviceConnected`, `deviceDisconnected(path,name,expected)`, `batteryChanged`, `pairingProgress`, `adapterReady`. |
+| `src/BluezManager.{h,cpp}` | The only D-Bus layer. Async wrapper over `org.bluez`. Tracks devices in `QMap<QString path, BtDevice>`. Holds the one-click state machine. Follows bluetoothd coming and going (see *BlueZ lifecycle* below). Emits `devicesChanged`, `deviceConnected`, `deviceDisconnected(path,name,expected)`, `batteryChanged`, `pairingProgress`, `adapterReady` (once the adapter is powered), `discoveringChanged`. |
 | `src/BtDevice.h` | Plain value object (snapshot) for a device + `isAudio()` heuristic (icon hint / class major field `0x04` / audio profile UUIDs) + `displayName()` (Alias→Name→Address). |
 | `src/BtAgent.{h,cpp}` | Auto-accepting `org.bluez.Agent1` (a `QDBusAbstractAdaptor`). Registered by `BluezManager` as the **default** agent so app-initiated `Pair()` completes a full authenticated bond silently (the "yes" `bluetoothctl` asks for). Every callback accepts; never rejects. Object path `/bluetoothheadphonesmanager/agent` (hyphens are illegal in D-Bus paths). |
 | `src/BluezTypes.h` | D-Bus marshalling typedefs `InterfaceList` (`a{sa{sv}}`) and `ManagedObjectList` (`a{oa{sa{sv}}}`); registered with `qDBusRegisterMetaType<>()` in `BluezManager::start()`. |
-| `src/TrayApp.{h,cpp}` | `QSystemTrayIcon` + context menu (header = connected device+battery, Settings, Quit), left-click opens Settings, disconnect notifications. |
+| `src/TrayApp.{h,cpp}` | `QSystemTrayIcon` + context menu (header = connected device+battery, Settings, Quit), left-click opens Settings, disconnect notifications. Re-creates the icon when a tray host appears (see *Tray icon under LXQt* below). |
 | `src/SettingsWindow.{h,cpp}` | Two `QListWidget`s (Paired / Available), audio-first, check mark on active device, battery, live progress text, Refresh, "Launch on startup". |
 | `src/AutoStart.{h,cpp}` | "Launch on startup" state. Default-on comes from a **system-wide** entry the `.deb` installs at `/etc/xdg/autostart/bluetooth-headphones-manager.desktop` (Exec `--minimized`), so it autostarts after install without launching once. The checkbox toggles a **per-user** override at `~/.config/autostart/bluetooth-headphones-manager.desktop`: unchecking writes `Hidden=true` to suppress the system entry, re-checking removes it. With no system entry (build tree), enabling writes a normal per-user entry pointing at the running binary. |
-| `src/Icons.{h,cpp}` | App/tray/audio icons from SVG resources, with a `QPainter` fallback if the SVG icon engine is missing. |
+| `src/Icons.{h,cpp}` | App/tray/audio icons from SVG resources, with a `QPainter` fallback if the SVG icon engine is missing. Tray icons are returned as raster frames at several sizes. |
 | `src/Logger.{h,cpp}` | Installs a Qt message handler; logs to `~/.local/share/bluetooth-headphones-manager/bluetooth-headphones-manager.log`. |
 | `resources/` | `resources.qrc` + placeholder SVG icons (`bt-connected`, `bt-disconnected`, `bluetooth-headphones-manager`, `audio`). |
 | `packaging/bluetooth-headphones-manager.desktop` | Installed menu entry (`Categories=AudioVideo;Audio;`). |
-| `packaging/bluetooth-headphones-manager-autostart.desktop` | System-wide XDG autostart entry, installed to `/etc/xdg/autostart/bluetooth-headphones-manager.desktop` (renamed to that basename; Exec `--minimized`). Makes launch-on-startup default-on after install; registered as a dpkg conffile. |
+| `packaging/bluetooth-headphones-manager-autostart.desktop` | System-wide XDG autostart entry, installed to `/etc/xdg/autostart/bluetooth-headphones-manager.desktop` (renamed to that basename; Exec `--minimized`). Makes launch-on-startup default-on after install; registered as a dpkg conffile. Carries `X-LXQt-Need-Tray=true` (lxqt-session starts it once the tray is up; other desktops ignore it), as does the per-user entry `AutoStart` writes. |
 
 ## Key implementation details to preserve
 
@@ -117,9 +118,27 @@ There are no automated tests; verify by building warning-free (`-Wall
   switching, explicit disconnect) are added to `m_intentionalDisconnect` so the
   "device disconnected" notification only fires on *unexpected* drops
   (`expected == false`). No auto-reconnect.
-- **Discovery is windowed:** auto-starts when the settings window opens, runs
-  ~60 s (single-shot `m_discoveryTimer` → `stopDiscovery`), restartable via
-  Refresh, stopped on window close.
+- **Discovery is windowed:** auto-starts when the settings window opens (or
+  on `adapterReady` while it is open), runs ~60 s (single-shot
+  `m_discoveryTimer` → `stopDiscovery`), restartable via Refresh, stopped on
+  window close.
+- **BlueZ lifecycle:** `start()` asks the bus `NameHasOwner("org.bluez")`
+  first and only talks to BlueZ if it is running — a blind call would
+  D-Bus-activate bluetoothd, which with no adapter times out after 25 s. A
+  `QDBusServiceWatcher` on `org.bluez` then re-registers the agent and
+  re-reads the managed objects every time bluetoothd starts, and drops all
+  state when it stops. Removing the used adapter (`InterfacesRemoved` with
+  `Adapter1`) forgets it; the next one that appears is taken. Don't call BlueZ
+  from those teardown paths (it would re-activate the daemon).
+- **Tray icon under LXQt:** with `QT_QPA_PLATFORMTHEME=lxqt` the tray is
+  served by lxqt-qtplugin's own StatusNotifierItem, which sends one pixmap
+  per `QIcon::availableSizes()` entry. An SVG-backed `QIcon` reports no
+  sizes, so the panel shows an "unknown" icon — keep `Icons::tray()`
+  returning raster frames. Qt (and the LXQt plugin) also choose between
+  StatusNotifierItem and XEmbed only once, when the `QSystemTrayIcon` is
+  constructed, so `TrayApp` re-creates it when `org.kde.StatusNotifierWatcher`
+  registers: an icon created before the panel would otherwise never show on
+  Wayland (no XEmbed there).
 - **Modules:** Core, Gui, Widgets, DBus, **Network** (Network only for the
   single-instance `QLocalServer`). Reflect any module change in both
   `CMakeLists.txt` and the `.deb` `Depends`.

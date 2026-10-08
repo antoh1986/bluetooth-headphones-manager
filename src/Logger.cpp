@@ -68,7 +68,9 @@ void init()
 
     g_path = dir + QStringLiteral("/bluetooth-headphones-manager.log");
     g_logFile.setFileName(g_path);
-    g_logFile.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+    // Not fatal: messageHandler() still writes to stderr.
+    if (!g_logFile.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
+        fprintf(stderr, "Cannot open log file %s\n", qPrintable(g_path));
 
     g_previousHandler = qInstallMessageHandler(messageHandler);
 }

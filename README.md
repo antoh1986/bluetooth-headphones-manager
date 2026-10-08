@@ -52,7 +52,7 @@ signals.
 | Desktop | Status |
 |---------|--------|
 | **Cinnamon** (Linux Mint) | Primary target, tested |
-| **LXQt** 2.x (Lubuntu, Debian and other LXQt setups) | Supported — native Qt 6 app, tray icon via StatusNotifierItem |
+| **LXQt** 2.x (Lubuntu, Debian and other LXQt setups) | Supported — native Qt 6 app, tray icon via StatusNotifierItem; tested on LXQt 2.3 (X11 and Wayland) |
 | Other desktops with a system tray (MATE, Xfce, KDE Plasma, …) | Should work |
 
 Feedback from LXQt and other desktops is welcome — please

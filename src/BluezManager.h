@@ -62,10 +62,13 @@ private slots:
     void onInterfacesRemoved(const QDBusObjectPath &path, const QStringList &ifaces);
     void onPropertiesChanged(const QString &iface, const QVariantMap &changed,
                              const QStringList &invalidated, const QDBusMessage &msg);
+    void onBluezStarted();              // org.bluez got an owner (bluetoothd up)
+    void onBluezStopped();              // ... and lost it again
 
 private:
     void fetchManagedObjects();
-    void handleAdapter(const QString &path);
+    void handleAdapter(const QString &path, const QVariantMap &props);
+    void forgetAdapter();               // adapter unplugged / bluetoothd gone
     void handleDeviceInterface(const QString &path, const QVariantMap &props);
     static void applyDeviceProps(BtDevice &d, const QVariantMap &props);
 
@@ -83,7 +86,9 @@ private:
 
     static QString humanError(const QDBusMessage &reply);
 
+    bool                  m_bluezRunning = false;
     QString               m_adapterPath;
+    bool                  m_adapterReadyPending = false; // adapterReady once Powered
     QObject              *m_agentObject = nullptr; // host for the BtAgent adaptor
     QMap<QString, BtDevice> m_devices;        // keyed by object path
     QSet<QString>         m_intentionalDisconnect; // suppress "lost" notify

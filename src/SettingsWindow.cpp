@@ -212,6 +212,13 @@ SettingsWindow::SettingsWindow(BluezManager *mgr, QWidget *parent)
 
     connect(m_mgr, &BluezManager::devicesChanged, this, &SettingsWindow::refreshLists);
     connect(m_mgr, &BluezManager::discoveringChanged, this, &SettingsWindow::refreshLists);
+    // The adapter showed up while the window is open (startup, dongle
+    // plugged in, bluetoothd started late): scan as if the window had just
+    // been opened.
+    connect(m_mgr, &BluezManager::adapterReady, this, [this]() {
+        if (isVisible())
+            m_mgr->startDiscovery();
+    });
     connect(m_mgr, &BluezManager::pairingProgress, this, &SettingsWindow::onPairingProgress);
     connect(m_mgr, &BluezManager::batteryChanged, this,
             [this](const QString &, int) { refreshLists(); });

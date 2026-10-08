@@ -5,6 +5,7 @@
 #include <QPolygonF>
 #include <QPointF>
 #include <QRectF>
+#include <QSize>
 #include <QColor>
 #include <QPen>
 #include <QtGlobal>
@@ -106,6 +107,18 @@ bool renderable(const QIcon &icon)
     return !icon.isNull() && !icon.pixmap(64, 64).isNull();
 }
 
+// Tray hosts that receive the icon as pixmaps -- LXQt's StatusNotifierItem
+// sends one per QIcon::availableSizes() entry -- get nothing from an
+// SVG-backed icon (it reports no sizes) and draw a generic "unknown" glyph.
+// Hand them pre-rendered frames at the usual panel sizes instead.
+QIcon rasterized(const QIcon &icon)
+{
+    QIcon out;
+    for (int px : {16, 22, 24, 32, 48, 64})
+        out.addPixmap(icon.pixmap(QSize(px, px), 1.0));
+    return out;
+}
+
 } // namespace
 
 namespace Icons {
@@ -115,10 +128,10 @@ QIcon tray(bool connected, int batteryPercent)
     // Connected always goes through the painter so the battery gauge can be
     // drawn; at full/unknown charge it is pixel-identical to the SVG anyway.
     if (connected)
-        return drawnTray(true, batteryPercent);
+        return rasterized(drawnTray(true, batteryPercent));
 
     QIcon icon(QStringLiteral(":/icons/bt-disconnected.svg"));
-    return renderable(icon) ? icon : drawnTray(false);
+    return rasterized(renderable(icon) ? icon : drawnTray(false));
 }
 
 QIcon audio()

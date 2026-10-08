@@ -81,6 +81,7 @@ bool writeUserEntry(bool enabled)
        << "Exec=" << exec << " --minimized\n"
        << "Icon=bluetooth-headphones-manager\n"
        << "Terminal=false\n"
+       << "X-LXQt-Need-Tray=true\n" // lxqt-session: start once the tray is up
        << "X-GNOME-Autostart-enabled=" << (enabled ? "true" : "false") << "\n"
        << "Hidden=" << (enabled ? "false" : "true") << "\n";
     ts.flush();

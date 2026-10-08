@@ -27,12 +27,16 @@ private slots:
     void updateState();
     void onDeviceConnected(const QString &path, const QString &name);
     void onDeviceDisconnected(const QString &path, const QString &name, bool expected);
+    void recreateTray();   // a tray host appeared after us
 
 private:
+    void createTray();
+
     BluezManager   *m_mgr = nullptr;
     QSystemTrayIcon *m_tray = nullptr;
     QMenu          *m_menu = nullptr;
     QAction        *m_headerAction = nullptr;
     SettingsWindow *m_window = nullptr;
     bool            m_connected = false;
+    int             m_iconKey = -3; // shown icon: battery %, -1 unknown, -2 off, -3 none
 };

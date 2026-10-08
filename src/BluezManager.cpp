@@ -11,10 +11,14 @@
 #include <QDBusPendingReply>
 #include <QDBusVariant>
 #include <QDBusMetaType>
+#include <QDBusServiceWatcher>
 
 #include <algorithm>
+#include <utility>
 
 namespace {
+const char *DBUS_SERVICE   = "org.freedesktop.DBus";
+const char *DBUS_PATH      = "/org/freedesktop/DBus";
 const char *BLUEZ          = "org.bluez";
 const char *OBJ_MANAGER    = "org.freedesktop.DBus.ObjectManager";
 const char *PROPS_IFACE    = "org.freedesktop.DBus.Properties";
@@ -61,13 +65,63 @@ void BluezManager::start()
     if (!ok)
         qWarning() << "Failed to subscribe to one or more BlueZ D-Bus signals";
 
-    registerAgent();
-
     m_discoveryTimer = new QTimer(this);
     m_discoveryTimer->setSingleShot(true);
     connect(m_discoveryTimer, &QTimer::timeout, this, &BluezManager::stopDiscovery);
 
+    // Follow bluetoothd coming and going (no adapter at login, USB dongle
+    // plugged in later, service restart). BlueZ forgets our agent when it
+    // exits, so register it and re-read the objects every time it starts.
+    auto *bluez = new QDBusServiceWatcher(BLUEZ, bus,
+                                          QDBusServiceWatcher::WatchForOwnerChange, this);
+    connect(bluez, &QDBusServiceWatcher::serviceRegistered,
+            this, &BluezManager::onBluezStarted);
+    connect(bluez, &QDBusServiceWatcher::serviceUnregistered,
+            this, &BluezManager::onBluezStopped);
+
+    // Only talk to BlueZ now if it is already running. A call to it otherwise
+    // makes D-Bus try to activate bluetoothd, which with no adapter present
+    // just times out after 25 s; the watcher catches it starting later.
+    QDBusMessage probe = QDBusMessage::createMethodCall(
+        DBUS_SERVICE, DBUS_PATH, DBUS_SERVICE, QStringLiteral("NameHasOwner"));
+    probe << QString(BLUEZ);
+    auto *w = new QDBusPendingCallWatcher(bus.asyncCall(probe), this);
+    connect(w, &QDBusPendingCallWatcher::finished, this,
+            [this](QDBusPendingCallWatcher *cw) {
+        cw->deleteLater();
+        QDBusPendingReply<bool> reply = *cw;
+        if (reply.isError() || reply.value())
+            onBluezStarted();
+        else
+            qInfo() << "BlueZ is not running; waiting for it to start";
+    });
+}
+
+void BluezManager::onBluezStarted()
+{
+    if (m_bluezRunning)
+        return; // the startup probe and the watcher can both report it
+    m_bluezRunning = true;
+    qInfo() << "BlueZ is running";
+    registerAgent();
     fetchManagedObjects();
+}
+
+void BluezManager::onBluezStopped()
+{
+    m_bluezRunning = false;
+    qWarning() << "BlueZ stopped; waiting for it to come back";
+
+    // Every BlueZ object is gone with the daemon.
+    forgetAdapter();
+    const QMap<QString, BtDevice> gone = std::exchange(m_devices, {});
+    for (const BtDevice &d : gone) {
+        if (d.connected)
+            emit deviceDisconnected(d.path, d.displayName(),
+                                    m_intentionalDisconnect.contains(d.path));
+    }
+    m_intentionalDisconnect.clear();
+    emit devicesChanged();
 }
 
 // ---------------------------------------------------------------------------
@@ -96,7 +150,7 @@ void BluezManager::fetchManagedObjects()
             const InterfaceList &ifaces = it.value();
 
             if (ifaces.contains(ADAPTER_IFACE))
-                handleAdapter(p);
+                handleAdapter(p, ifaces.value(ADAPTER_IFACE));
 
             if (ifaces.contains(DEVICE_IFACE)) {
                 handleDeviceInterface(p, ifaces.value(DEVICE_IFACE));
@@ -111,13 +165,32 @@ void BluezManager::fetchManagedObjects()
     });
 }
 
-void BluezManager::handleAdapter(const QString &path)
+void BluezManager::handleAdapter(const QString &path, const QVariantMap &props)
 {
     if (m_adapterPath.isEmpty()) {
         m_adapterPath = path;
         qInfo() << "Using adapter" << path;
         setAdapterPowered(true);
-        emit adapterReady();
+        // Discovery on a still unpowered adapter (just plugged in, bluetoothd
+        // just started) fails with NotReady, so report the adapter ready once
+        // Powered is true: now, or when PropertiesChanged says so.
+        m_adapterReadyPending = !props.value("Powered").toBool();
+        if (!m_adapterReadyPending)
+            emit adapterReady();
+    }
+}
+
+void BluezManager::forgetAdapter()
+{
+    if (m_adapterPath.isEmpty())
+        return;
+    qInfo() << "Adapter gone:" << m_adapterPath;
+    m_adapterPath.clear();
+    m_adapterReadyPending = false;
+    m_discoveryTimer->stop();
+    if (m_discovering) {
+        m_discovering = false;
+        emit discoveringChanged(false);
     }
 }
 
@@ -177,7 +250,7 @@ void BluezManager::onInterfacesAdded(const QDBusObjectPath &path,
     bool changed = false;
 
     if (ifaces.contains(ADAPTER_IFACE))
-        handleAdapter(p);
+        handleAdapter(p, ifaces.value(ADAPTER_IFACE));
 
     if (ifaces.contains(DEVICE_IFACE)) {
         handleDeviceInterface(p, ifaces.value(DEVICE_IFACE));
@@ -212,6 +285,13 @@ void BluezManager::onInterfacesRemoved(const QDBusObjectPath &path,
         m_devices[p].battery = -1;
         emit devicesChanged();
     }
+
+    // Our adapter was unplugged (BlueZ has already removed its devices), or
+    // bluetoothd is shutting down. handleAdapter() takes the next one that
+    // shows up. No re-scan for a second adapter here: calling BlueZ while it
+    // exits would just D-Bus-activate it again (Refresh does that re-scan).
+    if (ifaces.contains(ADAPTER_IFACE) && p == m_adapterPath)
+        forgetAdapter();
 }
 
 void BluezManager::onPropertiesChanged(const QString &iface,
@@ -220,6 +300,14 @@ void BluezManager::onPropertiesChanged(const QString &iface,
                                        const QDBusMessage &msg)
 {
     const QString p = msg.path();
+    if (p == m_adapterPath) {
+        if (m_adapterReadyPending && iface == QLatin1String(ADAPTER_IFACE) &&
+            changed.value("Powered").toBool()) {
+            m_adapterReadyPending = false;
+            emit adapterReady();
+        }
+        return;
+    }
     if (!m_devices.contains(p))
         return;
 
@@ -613,18 +701,24 @@ QString BluezManager::humanError(const QDBusMessage &reply)
 //
 // No sudo is needed: registering an agent for the active session is permitted
 // by polkit. On process exit the D-Bus name drops and BlueZ auto-removes the
-// agent, so no explicit UnregisterAgent is required.
+// agent, so no explicit UnregisterAgent is required. Called again each time
+// bluetoothd (re)starts, as a new daemon knows no agents.
 void BluezManager::registerAgent()
 {
     QDBusConnection bus = QDBusConnection::systemBus();
 
-    // Host object that carries the BtAgent adaptor; exported under default
-    // options (ExportAdaptors) so the org.bluez.Agent1 interface is published.
-    m_agentObject = new QObject(this);
-    new BtAgent(m_agentObject);
-    if (!bus.registerObject(QString::fromLatin1(BtAgent::objectPath()), m_agentObject)) {
-        qWarning() << "Failed to export pairing agent at" << BtAgent::objectPath();
-        return;
+    // Host object that carries the BtAgent adaptor; exported once, under
+    // default options (ExportAdaptors) so the org.bluez.Agent1 interface is
+    // published.
+    if (!m_agentObject) {
+        m_agentObject = new QObject(this);
+        new BtAgent(m_agentObject);
+        if (!bus.registerObject(QString::fromLatin1(BtAgent::objectPath()), m_agentObject)) {
+            qWarning() << "Failed to export pairing agent at" << BtAgent::objectPath();
+            delete m_agentObject;
+            m_agentObject = nullptr;
+            return;
+        }
     }
 
     QDBusMessage reg = QDBusMessage::createMethodCall(
