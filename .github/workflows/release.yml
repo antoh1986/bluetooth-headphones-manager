@@ -33,6 +33,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             build-essential cmake \
             qt6-base-dev libgl-dev \
+            libpulse-dev pkg-config \
             fakeroot
 
       - name: Set package version from tag

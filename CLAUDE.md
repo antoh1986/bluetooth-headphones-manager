@@ -52,8 +52,14 @@ D-Bus (system bus)** using Qt's `QtDBus` module.
   `InterfacesRemoved`, `PropertiesChanged`.
 - **UI language is English.** All user-facing strings in English.
 - **UI ↔ BlueZ only via signals/slots** on `BluezManager`. The UI never makes
-  D-Bus calls directly. (The one session-bus watch in `TrayApp`, for the
-  tray host appearing, is about the tray, not BlueZ.)
+  D-Bus calls directly. (The session-bus exceptions are about the desktop,
+  not BlueZ: `TrayApp` watches for the tray host appearing, and
+  `ThemeWatcher` reads the portal's color scheme.)
+- **Sound server only through `AudioManager`.** Default output and card
+  profiles have no BlueZ/D-Bus equivalent; they go through libpulse (the
+  PulseAudio API, also served by `pipewire-pulse`), with the same rules:
+  asynchronous, event-driven (server subscription), no polling, and the UI
+  only uses `AudioManager`'s accessors/slots and its `changed()` signal.
 
 ## Build / run / package
 
@@ -91,12 +97,14 @@ There are no automated tests; verify by building warning-free (`-Wall
 | `src/main.cpp` | Entry point: `QApplication` setup, logger init, single-instance guard (`QLocalServer`/`QLocalSocket`), `--minimized`/`--tray` parsing, wires `BluezManager` + `TrayApp`. |
 | `src/BluezManager.{h,cpp}` | The only D-Bus layer. Async wrapper over `org.bluez`. Tracks devices in `QMap<QString path, BtDevice>`. Holds the one-click state machine. Follows bluetoothd coming and going (see *BlueZ lifecycle* below). Emits `devicesChanged`, `deviceConnected`, `deviceDisconnected(path,name,expected)`, `batteryChanged`, `pairingProgress`, `adapterReady` (once the adapter is powered), `discoveringChanged`. |
 | `src/BtDevice.h` | Plain value object (snapshot) for a device + `isAudio()` heuristic (icon hint / class major field `0x04` / audio profile UUIDs) + `displayName()` (Alias→Name→Address). |
+| `src/AudioManager.{h,cpp}` | The only sound-server layer (libpulse on its GLib main loop, which runs on Qt's GLib event dispatcher). Tracks Bluetooth cards (profiles, active profile) and sinks by Bluetooth address, plus the default sink. `output(address)` → `Unknown`/`Elsewhere`/`Here`; `routeOutputTo(address)` makes the device the default sink (switching an output-less profile such as "Off" to the best playback one first); `setProfile(address, name)`. Emits `changed()` only on relevant changes. Reconnects with back-off if the server goes away. |
 | `src/BtAgent.{h,cpp}` | Auto-accepting `org.bluez.Agent1` (a `QDBusAbstractAdaptor`). Registered by `BluezManager` as the **default** agent so app-initiated `Pair()` completes a full authenticated bond silently (the "yes" `bluetoothctl` asks for). Every callback accepts; never rejects. Object path `/bluetoothheadphonesmanager/agent` (hyphens are illegal in D-Bus paths). |
 | `src/BluezTypes.h` | D-Bus marshalling typedefs `InterfaceList` (`a{sa{sv}}`) and `ManagedObjectList` (`a{oa{sa{sv}}}`); registered with `qDBusRegisterMetaType<>()` in `BluezManager::start()`. |
 | `src/TrayApp.{h,cpp}` | `QSystemTrayIcon` + context menu (header = connected device+battery, Settings, Quit), left-click opens Settings, disconnect notifications. Re-creates the icon when a tray host appears (see *Tray icon under LXQt* below). |
-| `src/SettingsWindow.{h,cpp}` | Two `QListWidget`s (Paired / Available), audio-first, check mark on active device, battery, live progress text, Refresh, "Launch on startup". |
+| `src/SettingsWindow.{h,cpp}` | Two `QListWidget`s (Paired / Available), audio-first, check mark on active device, battery, live progress text, Refresh, "Launch on startup". Left of the check mark: the sound-output indicator (green speaker = default output is this device; grey crossed speaker = elsewhere, click routes it here). Device actions menu has an "Audio profile" radio submenu. |
 | `src/AutoStart.{h,cpp}` | "Launch on startup" state. Default-on comes from a **system-wide** entry the `.deb` installs at `/etc/xdg/autostart/bluetooth-headphones-manager.desktop` (Exec `--minimized`), so it autostarts after install without launching once. The checkbox toggles a **per-user** override at `~/.config/autostart/bluetooth-headphones-manager.desktop`: unchecking writes `Hidden=true` to suppress the system entry, re-checking removes it. With no system entry (build tree), enabling writes a normal per-user entry pointing at the running binary. |
-| `src/Icons.{h,cpp}` | App/tray/audio icons from SVG resources, with a `QPainter` fallback if the SVG icon engine is missing. Tray icons are returned as raster frames at several sizes. |
+| `src/ThemeWatcher.{h,cpp}` | Follows the desktop's dark/light preference: reads `org.freedesktop.portal.Settings` `org.freedesktop.appearance` / `color-scheme` (async) and its `SettingChanged` signal. Qt < 6.5 ignores a GTK desktop's dark mode, so while the portal says "prefer dark" (1) and Qt's own palette is light it applies Fusion + a dark palette, restoring Qt's palette/style otherwise. Skipped when `QT_QPA_PLATFORMTHEME` is lxqt/kde/qt5ct/qt6ct (the user styles Qt there) and when Qt's palette is already dark. |
+| `src/Icons.{h,cpp}` | App/tray/audio icons from SVG resources, with a `QPainter` fallback if the SVG icon engine is missing. Tray icons are returned as raster frames at several sizes. Painter-drawn sound-output speaker; `okGreen()` picks a green readable on the current (light/dark) palette — `SettingsWindow` rebuilds its rows on `PaletteChange`. |
 | `src/Logger.{h,cpp}` | Installs a Qt message handler; logs to `~/.local/share/bluetooth-headphones-manager/bluetooth-headphones-manager.log`. |
 | `resources/` | `resources.qrc` + placeholder SVG icons (`bt-connected`, `bt-disconnected`, `bluetooth-headphones-manager`, `audio`). |
 | `packaging/bluetooth-headphones-manager.desktop` | Installed menu entry (`Categories=AudioVideo;Audio;`). |
@@ -140,13 +148,26 @@ There are no automated tests; verify by building warning-free (`-Wall
   registers: an icon created before the panel would otherwise never show on
   Wayland (no XEmbed there).
 - **Modules:** Core, Gui, Widgets, DBus, **Network** (Network only for the
-  single-instance `QLocalServer`). Reflect any module change in both
-  `CMakeLists.txt` and the `.deb` `Depends`.
+  single-instance `QLocalServer`), plus `libpulse` + `libpulse-mainloop-glib`
+  via pkg-config. Reflect any module change in both `CMakeLists.txt` and the
+  `.deb` `Depends` (and CI's/README's build packages).
+- **Sound output / profiles:** cards and sinks are matched to a device by
+  Bluetooth address (`api.bluez5.address` on PipeWire, `device.string` with
+  `device.bus=bluetooth` on PulseAudio). "Plays through the device" means the
+  server's default sink is one of its sinks; routing just sets the default
+  sink, like the desktop's sound settings (PipeWire moves streams that follow
+  the default). Profiles are listed Off → playback-only (A2DP) → headset,
+  each tagged Best / Medium / Low quality (`profileQuality()`: LDAC, aptX
+  HD/Lossless, LC3plus = best; headset modes = low; other A2DP = medium —
+  the server's priority does not track quality, e.g. SBC > SBC-XQ).
+  `AudioManager::start()` disables itself if Qt's event dispatcher is not GLib
+  based (`QT_NO_GLIB`).
 - **`.deb` dependencies** list classic Qt6 names with `*t64` alternatives
   (e.g. `libqt6core6 | libqt6core6t64`) for old and new Mint/Ubuntu/Debian,
-  plus `libqt6svg6` (SVG icon engine plugin, loaded at runtime) and
+  plus `libqt6svg6` (SVG icon engine plugin, loaded at runtime),
   `qt6-qpa-plugins` (Debian splits the xcb platform plugin out of
-  `libqt6gui6`; without it the app cannot start).
+  `libqt6gui6`; without it the app cannot start) and `libpulse0`,
+  `libpulse-mainloop-glib0`.
 
 ## Extension points
 
@@ -164,6 +185,9 @@ There are no automated tests; verify by building warning-free (`-Wall
 - Qt6Gui's CMake config hard-requires the OpenGL headers (`GL/gl.h`, package
   `libgl-dev`). On Ubuntu 22.04 `qt6-base-dev` does not pull it in, so CI and
   the README install it explicitly — keep it there.
+- Include the libpulse headers before any Qt header in a translation unit
+  (`pulse/glib-mainloop.h` pulls in GLib, which must not see Qt's
+  `signals`/`slots` macros).
 
 - `organizationName` and `applicationName` are both
   `bluetooth-headphones-manager`, while `applicationDisplayName` is

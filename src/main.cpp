@@ -8,6 +8,8 @@
 #include "Logger.h"
 #include "Icons.h"
 #include "BluezManager.h"
+#include "AudioManager.h"
+#include "ThemeWatcher.h"
 #include "TrayApp.h"
 
 namespace {
@@ -55,6 +57,9 @@ int main(int argc, char *argv[])
         return 0;
     }
 
+    ThemeWatcher theme;
+    theme.start();
+
     const QStringList args = QApplication::arguments();
     const bool minimized = args.contains(QStringLiteral("--minimized")) ||
                            args.contains(QStringLiteral("--tray"));
@@ -63,9 +68,11 @@ int main(int argc, char *argv[])
         qWarning() << "System tray is not available in this environment";
 
     BluezManager manager;
-    TrayApp tray(&manager);
+    AudioManager audio;
+    TrayApp tray(&manager, &audio);
     tray.show();
     manager.start();
+    audio.start();
 
     // A second invocation connects to our server -> bring up the window.
     QObject::connect(&server, &QLocalServer::newConnection, [&]() {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QIcon>
+#include <QColor>
 
 // Central place for the application icons. Each accessor first tries the SVG
 // resource and, if the SVG icon engine is unavailable at runtime, falls back
@@ -10,5 +11,7 @@
 namespace Icons {
     QIcon tray(bool connected, int batteryPercent = -1); // colour + battery gauge
     QIcon audio();                // small badge for audio devices
+    QIcon output(bool here);      // system sound plays / does not play here
+    QColor okGreen();             // "all good" green, readable on the palette
     QIcon app();                  // application / window icon
 }

@@ -1,5 +1,6 @@
 #include "SettingsWindow.h"
 #include "BluezManager.h"
+#include "AudioManager.h"
 #include "AutoStart.h"
 #include "BusyIndicator.h"
 #include "Icons.h"
@@ -13,6 +14,7 @@
 #include <QToolButton>
 #include <QMenu>
 #include <QAction>
+#include <QActionGroup>
 #include <QApplication>
 #include <QCheckBox>
 #include <QClipboard>
@@ -43,6 +45,23 @@ QLineEdit *selectableField(const QString &value, QWidget *parent)
 QString availableValue(const QString &value)
 {
     return value.isEmpty() ? QObject::tr("Not available") : value;
+}
+
+// Shown next to an audio profile so the best-sounding one stands out.
+QString qualityLabel(const AudioProfile &p)
+{
+    switch (p.quality) {
+    case AudioProfile::Quality::Best:
+        return QObject::tr("Best quality");
+    case AudioProfile::Quality::Medium:
+        return QObject::tr("Medium quality");
+    case AudioProfile::Quality::Low:
+        return p.hasInput ? QObject::tr("Low quality, with microphone")
+                          : QObject::tr("Low quality");
+    case AudioProfile::Quality::None:
+        break;
+    }
+    return QString();
 }
 
 class DeviceInfoDialog final : public QDialog
@@ -148,8 +167,8 @@ public:
 
 } // namespace
 
-SettingsWindow::SettingsWindow(BluezManager *mgr, QWidget *parent)
-    : QWidget(parent), m_mgr(mgr)
+SettingsWindow::SettingsWindow(BluezManager *mgr, AudioManager *audio, QWidget *parent)
+    : QWidget(parent), m_mgr(mgr), m_audio(audio)
 {
     setWindowTitle(tr("Bluetooth Headphones Manager"));
     setWindowIcon(Icons::app());
@@ -226,8 +245,70 @@ SettingsWindow::SettingsWindow(BluezManager *mgr, QWidget *parent)
             [this](const QString &p, const QString &) { m_progress.remove(p); refreshLists(); });
     connect(m_mgr, &BluezManager::deviceDisconnected, this,
             [this](const QString &p, const QString &, bool) { m_progress.remove(p); refreshLists(); });
+    connect(m_audio, &AudioManager::changed, this, &SettingsWindow::refreshLists);
 
     refreshLists();
+}
+
+// Left of the check mark of a connected audio device: shows whether the
+// system sound plays through it; when it does not, a click routes it there.
+// nullptr when the sound server knows nothing about the device.
+QWidget *SettingsWindow::makeOutputIndicator(const BtDevice &d, QWidget *row)
+{
+    const AudioManager::Output out = m_audio->output(d.address);
+    if (out == AudioManager::Output::Unknown)
+        return nullptr;
+
+    if (out == AudioManager::Output::Here) {
+        auto *here = new QLabel(row);
+        here->setPixmap(Icons::output(true).pixmap(22, 22));
+        here->setAlignment(Qt::AlignCenter);
+        here->setFixedSize(30, 30);
+        here->setToolTip(tr("System sound is playing through %1").arg(d.displayName()));
+        return here;
+    }
+
+    const QString current = m_audio->defaultOutputName();
+    auto *route = new QToolButton(row);
+    route->setIcon(Icons::output(false));
+    route->setIconSize(QSize(22, 22));
+    route->setAutoRaise(true);
+    route->setFixedSize(30, 30);
+    route->setToolTip(
+        (current.isEmpty() ? tr("System sound is not playing through this device.")
+                           : tr("System sound is playing through %1.").arg(current)) +
+        QLatin1Char('\n') + tr("Click to play it through %1.").arg(d.displayName()));
+    route->setAccessibleName(tr("Play sound through %1").arg(d.displayName()));
+    connect(route, &QToolButton::clicked, this,
+            [this, address = d.address]() { m_audio->routeOutputTo(address); });
+    return route;
+}
+
+// "Audio profile" submenu (A2DP codecs, headset mode, off) as the sound
+// server offers them for a connected device, each with its quality tier in
+// the right-hand (shortcut) column.
+void SettingsWindow::addProfileMenu(QMenu *menu, const BtDevice &d)
+{
+    const QList<AudioProfile> profiles = m_audio->profiles(d.address);
+    if (!d.connected || profiles.isEmpty())
+        return;
+
+    QMenu *sub = menu->addMenu(tr("Audio profile"));
+    auto *group = new QActionGroup(sub); // exclusive: radio items
+    const QString active = m_audio->activeProfile(d.address);
+    for (const AudioProfile &p : profiles) {
+        const QString quality = qualityLabel(p);
+        QAction *action = sub->addAction(
+            quality.isEmpty() ? p.description : p.description + QLatin1Char('\t') + quality);
+        action->setCheckable(true);
+        action->setChecked(p.name == active);
+        action->setEnabled(p.available);
+        group->addAction(action);
+        connect(action, &QAction::triggered, this,
+                [this, address = d.address, name = p.name](bool) {
+                    m_audio->setProfile(address, name);
+                });
+    }
 }
 
 QWidget *SettingsWindow::makeRow(const BtDevice &d, const QString &progress)
@@ -287,10 +368,15 @@ QWidget *SettingsWindow::makeRow(const BtDevice &d, const QString &progress)
 
     h->addStretch();
 
+    QWidget *output = d.connected ? makeOutputIndicator(d, row) : nullptr;
+    if (output)
+        h->addWidget(output);
+
     if (d.connected) {
         auto *check = new QLabel(QStringLiteral("✓"), row); // check mark
         check->setStyleSheet(
-            QStringLiteral("color: #2e7d32; font-weight: bold; font-size: 18px;"));
+            QStringLiteral("color: %1; font-weight: bold; font-size: 18px;")
+                .arg(Icons::okGreen().name()));
         h->addWidget(check);
     }
 
@@ -308,6 +394,8 @@ QWidget *SettingsWindow::makeRow(const BtDevice &d, const QString &progress)
         DeviceInfoDialog dialog(device, this);
         dialog.exec();
     });
+
+    addProfileMenu(menu, d);
 
     menu->addSeparator();
     QAction *disconnect = menu->addAction(tr("Disconnect"));
@@ -329,6 +417,8 @@ QWidget *SettingsWindow::makeRow(const BtDevice &d, const QString &progress)
     const auto labels = row->findChildren<QLabel *>();
     for (QLabel *label : labels)
         label->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+    if (output) // keep its tooltip
+        output->setAttribute(Qt::WA_TransparentForMouseEvents, false);
 
     return row;
 }
@@ -416,6 +506,14 @@ void SettingsWindow::openAndDiscover()
     activateWindow();
     refreshLists();
     m_mgr->startDiscovery();
+}
+
+void SettingsWindow::changeEvent(QEvent *event)
+{
+    // Light/dark switch: rebuild the rows, whose greens follow the palette.
+    if (event->type() == QEvent::PaletteChange)
+        refreshLists();
+    QWidget::changeEvent(event);
 }
 
 void SettingsWindow::closeEvent(QCloseEvent *event)

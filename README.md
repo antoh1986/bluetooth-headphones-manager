@@ -45,7 +45,10 @@ signals.
 - **Windowed discovery** — scans while Settings is open, stops automatically and supports manual refresh.
 - **Disconnect notifications** — warns about unexpected drops without noisy notifications for intentional disconnects.
 - **Launch on startup** — starts minimized in the tray after login and can be disabled in Settings.
+- **Dark mode** — follows the desktop's dark/light preference (also on Cinnamon and GNOME with Qt 6 versions that do not do it by themselves) and switches live.
 - **Device information** — shows selectable device details and a one-click copy button for the Bluetooth MAC address.
+- **Sound output indicator** — a speaker next to the connected device shows whether the system sound actually plays through it; if it does not, one click makes it the default output.
+- **Audio profile switching** — pick the A2DP codec (SBC, SBC-XQ, AAC, LDAC, … as offered by the sound server) or the headset (HSP/HFP) mode from the device menu; each profile is tagged *Best*, *Medium* or *Low quality*.
 
 ## Supported desktops
 
@@ -100,12 +103,14 @@ To install and run the prebuilt package you only need:
 - A distribution that ships Qt 6.2 or newer: Linux Mint 21+, LMDE 6+,
   Ubuntu 22.04+ or Debian 12+
 - BlueZ running on the system bus
+- PipeWire (with `pipewire-pulse`) or PulseAudio for the sound output
+  indicator and audio profiles; everything else works without them
 - x86-64 for the provided Debian package
 
 The Qt 6 runtime libraries the application links against (Core, Gui, Widgets,
-DBus and Network) are pulled in automatically by `apt` from your
-distribution's repositories when you install the `.deb`, so you do not need to
-set up Qt yourself.
+DBus and Network) and the PulseAudio client library are pulled in
+automatically by `apt` from your distribution's repositories when you install
+the `.deb`, so you do not need to set up Qt yourself.
 
 
 ## Installation
@@ -138,7 +143,7 @@ next login. You can also launch it directly with
 ### Build the `.deb` from source
 
 ```bash
-sudo apt install -y build-essential cmake qt6-base-dev libgl-dev
+sudo apt install -y build-essential cmake qt6-base-dev libgl-dev libpulse-dev pkg-config
 
 git clone https://github.com/antoh1986/bluetooth-headphones-manager.git
 cd bluetooth-headphones-manager
@@ -158,6 +163,8 @@ These are only needed to **build** the application from source:
 - Qt 6.2 or newer development libraries: Core, Gui, Widgets, DBus and Network
   (the `qt6-base-dev` package, plus `libgl-dev` for the OpenGL headers that
   Qt's CMake files require)
+- PulseAudio client library with its GLib main loop (`libpulse-dev`) and
+  `pkg-config`
 - GCC with C++17 support
 - CMake 3.16 or newer
 
@@ -169,7 +176,8 @@ If Qt 6 is installed outside the default search path, point CMake at it with
 
 - Left-click the tray icon, or choose **Settings**, to open the device list.
 - Click a device to connect. New devices are paired, trusted and connected automatically.
-- Use the device actions menu to view device information, copy its MAC address, disconnect or forget it.
+- Use the device actions menu to view device information, copy its MAC address, switch the audio profile, disconnect or forget it.
+- A green speaker next to the connected device means the system sound plays through it; a grey crossed-out one means it plays elsewhere — click it to switch the sound to the device.
 - Use **Refresh** to restart Bluetooth discovery.
 - Toggle **Launch on startup** to control autostart.
 - Choose **Quit** from the tray menu to exit completely.
@@ -177,7 +185,7 @@ If Qt 6 is installed outside the default search path, point CMake at it with
 ## Building without packaging
 
 ```bash
-sudo apt install -y build-essential cmake qt6-base-dev libgl-dev
+sudo apt install -y build-essential cmake qt6-base-dev libgl-dev libpulse-dev pkg-config
 
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
@@ -234,3 +242,8 @@ libraries provided by your distribution, so they can be updated or replaced
 independently. The Qt source code is available from
 [download.qt.io](https://download.qt.io/) and from your distribution's source
 packages. Qt is a registered trademark of The Qt Company Ltd.
+
+It also links dynamically to the PulseAudio client libraries (`libpulse`,
+`libpulse-mainloop-glib`) provided by your distribution, which are licensed
+under the
+[GNU Lesser General Public License v2.1 or later](https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html).

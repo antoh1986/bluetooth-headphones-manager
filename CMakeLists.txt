@@ -43,12 +43,20 @@ endif()
 # Linux Mint 21); newer Qt 6 releases run the same binary.
 find_package(Qt6 6.2 REQUIRED COMPONENTS Core Gui Widgets DBus Network)
 
+# PulseAudio client library (pipewire-pulse serves the same API): default
+# audio output and Bluetooth card profiles. The GLib main loop flavour runs on
+# the GLib event loop Qt itself uses.
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(PULSE REQUIRED IMPORTED_TARGET libpulse libpulse-mainloop-glib)
+
 set(SOURCES
     src/main.cpp
     src/Logger.cpp
     src/Icons.cpp
     src/AutoStart.cpp
     src/BluezManager.cpp
+    src/AudioManager.cpp
+    src/ThemeWatcher.cpp
     src/BtAgent.cpp
     src/SettingsWindow.cpp
     src/BusyIndicator.cpp
@@ -63,6 +71,8 @@ set(HEADERS
     src/BluezTypes.h
     src/BtDevice.h
     src/BluezManager.h
+    src/AudioManager.h
+    src/ThemeWatcher.h
     src/BtAgent.h
     src/SettingsWindow.h
     src/BusyIndicator.h
@@ -82,6 +92,7 @@ target_link_libraries(bluetooth-headphones-manager PRIVATE
     Qt6::Widgets
     Qt6::DBus
     Qt6::Network
+    PkgConfig::PULSE
 )
 
 # ---------------------------------------------------------------------------

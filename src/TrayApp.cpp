@@ -10,10 +10,10 @@
 #include <QDBusServiceWatcher>
 #include <QDebug>
 
-TrayApp::TrayApp(BluezManager *mgr, QObject *parent)
+TrayApp::TrayApp(BluezManager *mgr, AudioManager *audio, QObject *parent)
     : QObject(parent), m_mgr(mgr)
 {
-    m_window = new SettingsWindow(mgr);
+    m_window = new SettingsWindow(mgr, audio);
 
     createTray();
 

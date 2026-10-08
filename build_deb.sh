@@ -123,6 +123,10 @@ Comment: This program uses the Qt 6 libraries (Qt Core, Qt Gui, Qt Widgets,
  /usr/share/common-licenses/LGPL-3 and the GPL v3 text it supplements is in
  /usr/share/common-licenses/GPL-3. Qt source code is available from
  https://download.qt.io/ and from the distribution's source packages.
+ It also links dynamically to the PulseAudio client libraries (libpulse,
+ libpulse-mainloop-glib) from the distribution, used under the GNU Lesser
+ General Public License version 2.1 or later
+ (/usr/share/common-licenses/LGPL-2.1).
 
 Files: *
 Copyright: $(sed -n 's/^Copyright (c) //p' "${SCRIPT_DIR}/LICENSE")
@@ -147,14 +151,15 @@ Architecture: ${ARCH}
 Maintainer: ${MAINTAINER}
 Installed-Size: ${INSTALLED_SIZE}
 Homepage: https://github.com/antoh1986/bluetooth-headphones-manager
-Depends: libc6, libstdc++6, libqt6core6 | libqt6core6t64, libqt6gui6 | libqt6gui6t64, libqt6widgets6 | libqt6widgets6t64, libqt6dbus6 | libqt6dbus6t64, libqt6network6 | libqt6network6t64, libqt6svg6, qt6-qpa-plugins, bluez
+Depends: libc6, libstdc++6, libqt6core6 | libqt6core6t64, libqt6gui6 | libqt6gui6t64, libqt6widgets6 | libqt6widgets6t64, libqt6dbus6 | libqt6dbus6t64, libqt6network6 | libqt6network6t64, libqt6svg6, qt6-qpa-plugins, libpulse0, libpulse-mainloop-glib0, bluez
 Description: Bluetooth Headphones Manager
  System tray application for Linux Mint / Cinnamon, LXQt and other Linux
  desktops that pairs, trusts and connects Bluetooth audio devices with a
  single click. The tray icon colour reflects the connection state, the
  right-click menu shows the currently connected device and its battery level,
  and a settings window lists paired and available devices with audio devices
- shown first.
+ shown first, shows whether the system sound plays through the connected
+ device (one click routes it there) and switches its audio profile (codec).
 EOF
 
 echo "==> Writing DEBIAN/conffiles"

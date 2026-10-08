@@ -4,6 +4,7 @@
 #include <QSystemTrayIcon>
 
 class BluezManager;
+class AudioManager;
 class SettingsWindow;
 class QMenu;
 class QAction;
@@ -15,7 +16,7 @@ class TrayApp : public QObject
 {
     Q_OBJECT
 public:
-    explicit TrayApp(BluezManager *mgr, QObject *parent = nullptr);
+    TrayApp(BluezManager *mgr, AudioManager *audio, QObject *parent = nullptr);
 
     void show();   // make the tray icon visible
 

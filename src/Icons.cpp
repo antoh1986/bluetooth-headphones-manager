@@ -9,6 +9,8 @@
 #include <QColor>
 #include <QPen>
 #include <QtGlobal>
+#include <QGuiApplication>
+#include <QPalette>
 
 namespace {
 
@@ -102,6 +104,40 @@ QIcon drawnAudio()
     return QIcon(pm);
 }
 
+// A loudspeaker: green with sound waves when the system sound plays through
+// the device, grey with a red cross when it plays somewhere else.
+QIcon drawnOutput(bool here)
+{
+    QPixmap pm(48, 48);
+    pm.fill(Qt::transparent);
+
+    QPainter p(&pm);
+    p.setRenderHint(QPainter::Antialiasing, true);
+
+    p.setPen(Qt::NoPen);
+    p.setBrush(here ? Icons::okGreen() : QColor("#9e9e9e"));
+    p.drawRect(QRectF(5, 18, 9, 12));                  // magnet
+    QPolygonF cone;
+    cone << QPointF(13, 18) << QPointF(24, 8) << QPointF(24, 40) << QPointF(13, 30);
+    p.drawPolygon(cone);
+
+    QPen pen(here ? Icons::okGreen() : QColor("#e53935"));
+    pen.setWidthF(3.5);
+    pen.setCapStyle(Qt::RoundCap);
+    p.setPen(pen);
+    p.setBrush(Qt::NoBrush);
+    if (here) {
+        for (qreal r : {8.0, 15.0})                    // sound waves
+            p.drawArc(QRectF(24 - r, 24 - r, 2 * r, 2 * r), -45 * 16, 90 * 16);
+    } else {
+        p.drawLine(QPointF(31, 19), QPointF(41, 29));  // cross
+        p.drawLine(QPointF(41, 19), QPointF(31, 29));
+    }
+    p.end();
+
+    return QIcon(pm);
+}
+
 bool renderable(const QIcon &icon)
 {
     return !icon.isNull() && !icon.pixmap(64, 64).isNull();
@@ -138,6 +174,17 @@ QIcon audio()
 {
     QIcon icon(QStringLiteral(":/icons/audio.svg"));
     return renderable(icon) ? icon : drawnAudio();
+}
+
+QColor okGreen()
+{
+    const bool dark = QGuiApplication::palette().color(QPalette::Window).lightness() < 128;
+    return QColor(dark ? "#66bb6a" : "#2e7d32");
+}
+
+QIcon output(bool here)
+{
+    return drawnOutput(here);
 }
 
 QIcon app()

@@ -7,12 +7,14 @@
 #include "BtDevice.h"
 
 class BluezManager;
+class AudioManager;
 class BusyIndicator;
 class QListWidget;
 class QListWidgetItem;
 class QPushButton;
 class QCheckBox;
 class QLabel;
+class QMenu;
 
 // The settings window: two device lists (paired / available), a Refresh
 // button and the "Launch on startup" toggle. Opening it starts discovery,
@@ -21,7 +23,7 @@ class SettingsWindow : public QWidget
 {
     Q_OBJECT
 public:
-    explicit SettingsWindow(BluezManager *mgr, QWidget *parent = nullptr);
+    SettingsWindow(BluezManager *mgr, AudioManager *audio, QWidget *parent = nullptr);
 
     void openAndDiscover();   // show + raise + start discovery
 
@@ -30,6 +32,7 @@ public slots:
     void onPairingProgress(const QString &path, const QString &status);
 
 protected:
+    void changeEvent(QEvent *event) override;
     void closeEvent(QCloseEvent *event) override;
 
 private slots:
@@ -40,8 +43,11 @@ private slots:
 
 private:
     QWidget *makeRow(const BtDevice &d, const QString &progress);
+    QWidget *makeOutputIndicator(const BtDevice &d, QWidget *row);
+    void addProfileMenu(QMenu *menu, const BtDevice &d);
 
     BluezManager *m_mgr = nullptr;
+    AudioManager *m_audio = nullptr;
     QListWidget  *m_paired = nullptr;
     QListWidget  *m_available = nullptr;
     QPushButton  *m_refresh = nullptr;
