@@ -100,6 +100,7 @@ private:
     void removeSink(quint32 index);
     void setDefaultSink(const QString &name);
     const Card *cardFor(const QString &address) const;
+    static bool activeHasOutput(const Card &card);
 
     pa_glib_mainloop     *m_mainloop = nullptr;
     pa_context           *m_context = nullptr;

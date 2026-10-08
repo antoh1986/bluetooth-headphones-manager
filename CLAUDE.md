@@ -101,7 +101,7 @@ There are no automated tests; verify by building warning-free (`-Wall
 | `src/BtAgent.{h,cpp}` | Auto-accepting `org.bluez.Agent1` (a `QDBusAbstractAdaptor`). Registered by `BluezManager` as the **default** agent so app-initiated `Pair()` completes a full authenticated bond silently (the "yes" `bluetoothctl` asks for). Every callback accepts; never rejects. Object path `/bluetoothheadphonesmanager/agent` (hyphens are illegal in D-Bus paths). |
 | `src/BluezTypes.h` | D-Bus marshalling typedefs `InterfaceList` (`a{sa{sv}}`) and `ManagedObjectList` (`a{oa{sa{sv}}}`); registered with `qDBusRegisterMetaType<>()` in `BluezManager::start()`. |
 | `src/TrayApp.{h,cpp}` | `QSystemTrayIcon` + context menu (header = connected device+battery, Settings, Quit), left-click opens Settings, disconnect notifications. Re-creates the icon when a tray host appears (see *Tray icon under LXQt* below). |
-| `src/SettingsWindow.{h,cpp}` | Two `QListWidget`s (Paired / Available), audio-first, check mark on active device, battery, live progress text, Refresh, "Launch on startup". Left of the check mark: the sound-output indicator (green speaker = default output is this device; grey crossed speaker = elsewhere, click routes it here). Device actions menu has an "Audio profile" radio submenu. |
+| `src/SettingsWindow.{h,cpp}` | Two `QListWidget`s (Paired / Available), audio-first, check mark on active device, battery, live progress text, Refresh, "Launch on startup". Left of the check mark: the sound-output indicator (green speaker = default output is this device; otherwise a framed "Play here" button with a grey crossed speaker that routes it here — also when the active profile has no output). Device actions menu has an "Audio profile" radio submenu. |
 | `src/AutoStart.{h,cpp}` | "Launch on startup" state. Default-on comes from a **system-wide** entry the `.deb` installs at `/etc/xdg/autostart/bluetooth-headphones-manager.desktop` (Exec `--minimized`), so it autostarts after install without launching once. The checkbox toggles a **per-user** override at `~/.config/autostart/bluetooth-headphones-manager.desktop`: unchecking writes `Hidden=true` to suppress the system entry, re-checking removes it. With no system entry (build tree), enabling writes a normal per-user entry pointing at the running binary. |
 | `src/ThemeWatcher.{h,cpp}` | Follows the desktop's dark/light preference: reads `org.freedesktop.portal.Settings` `org.freedesktop.appearance` / `color-scheme` (async) and its `SettingChanged` signal. Qt < 6.5 ignores a GTK desktop's dark mode, so while the portal says "prefer dark" (1) and Qt's own palette is light it applies Fusion + a dark palette, restoring Qt's palette/style otherwise. Skipped when `QT_QPA_PLATFORMTHEME` is lxqt/kde/qt5ct/qt6ct (the user styles Qt there) and when Qt's palette is already dark. |
 | `src/Icons.{h,cpp}` | App/tray/audio icons from SVG resources, with a `QPainter` fallback if the SVG icon engine is missing. Tray icons are returned as raster frames at several sizes. Painter-drawn sound-output speaker; `okGreen()` picks a green readable on the current (light/dark) palette — `SettingsWindow` rebuilds its rows on `PaletteChange`. |
@@ -156,7 +156,11 @@ There are no automated tests; verify by building warning-free (`-Wall
   `device.bus=bluetooth` on PulseAudio). "Plays through the device" means the
   server's default sink is one of its sinks; routing just sets the default
   sink, like the desktop's sound settings (PipeWire moves streams that follow
-  the default). Profiles are listed Off → playback-only (A2DP) → headset,
+  the default) — and the card's active profile must have an output:
+  WirePlumber 0.5 (PipeWire ≥ 1.2) keeps a persistent
+  `bluez_output.<addr>` sink across profile changes, even on "Off", while
+  older stacks drop the sink (`…<addr>.1`) and `routeOutputTo` waits for it
+  to reappear. Profiles are listed Off → playback-only (A2DP) → headset,
   each tagged Best / Medium / Low quality (`profileQuality()`: LDAC, aptX
   HD/Lossless, LC3plus = best; headset modes = low; other A2DP = medium —
   the server's priority does not track quality, e.g. SBC > SBC-XQ).

@@ -358,6 +358,15 @@ const AudioManager::Card *AudioManager::cardFor(const QString &address) const
     return nullptr;
 }
 
+bool AudioManager::activeHasOutput(const Card &card)
+{
+    for (const AudioProfile &p : card.profiles) {
+        if (p.name == card.active)
+            return p.hasOutput;
+    }
+    return false;
+}
+
 QList<AudioProfile> AudioManager::profiles(const QString &address) const
 {
     const Card *card = cardFor(address);
@@ -372,8 +381,13 @@ QString AudioManager::activeProfile(const QString &address) const
 
 AudioManager::Output AudioManager::output(const QString &address) const
 {
-    if (!m_ready || !cardFor(address))
+    const Card *card = m_ready ? cardFor(address) : nullptr;
+    if (!card)
         return Output::Unknown;
+    // WirePlumber 0.5 keeps a device's sink across profile changes, even on
+    // "Off"; nothing reaches the device then.
+    if (!activeHasOutput(*card))
+        return Output::Elsewhere;
     const QString addr = address.toUpper();
     for (const Sink &sink : m_sinks) {
         if (sink.address == addr && sink.name == m_defaultSink)
@@ -404,18 +418,26 @@ void AudioManager::routeOutputTo(const QString &address)
     if (!m_ready)
         return;
     const QString addr = address.toUpper();
-    for (const Sink &sink : m_sinks) {
-        if (sink.address == addr) {
-            setDefaultSink(sink.name);
-            return;
-        }
-    }
-
-    // No sink in the active profile: switch to the best playback profile
-    // first; updateSink() makes the new sink the default once it appears.
     const Card *card = cardFor(addr);
     if (!card)
         return;
+    QString sinkName;
+    for (const Sink &sink : m_sinks) {
+        if (sink.address == addr) {
+            sinkName = sink.name;
+            break;
+        }
+    }
+    if (activeHasOutput(*card)) {
+        if (!sinkName.isEmpty())
+            setDefaultSink(sinkName);
+        return;
+    }
+
+    // The active profile has no output: switch to the best playback profile
+    // first. PipeWire with WirePlumber 0.5 keeps the device's sink meanwhile,
+    // so it can be made the default right away; otherwise updateSink() does
+    // that once the new sink appears.
     const AudioProfile *best = nullptr;
     for (const AudioProfile &p : card->profiles) {
         if (p.available && p.hasOutput && (!best || p.priority > best->priority))
@@ -425,8 +447,12 @@ void AudioManager::routeOutputTo(const QString &address)
         qWarning().noquote() << "Audio:" << addr << "has no playback profile";
         return;
     }
-    m_pendingRoute = addr;
-    setProfile(addr, best->name);
+    const QString profile = best->name;   // setProfile() leaves *card alone
+    if (sinkName.isEmpty())
+        m_pendingRoute = addr;
+    setProfile(addr, profile);
+    if (!sinkName.isEmpty())
+        setDefaultSink(sinkName);
 }
 
 void AudioManager::setDefaultSink(const QString &name)

@@ -32,7 +32,8 @@ other desktop that provides a system tray.
 The application communicates directly with **BlueZ over the system D-Bus**
 through Qt's `QtDBus` module. It never shells out to `bluetoothctl`, never
 polls command output, and keeps the interface synchronized through BlueZ
-signals.
+signals. The sound output and audio profiles are handled the same way through
+the PulseAudio client API, which PipeWire (`pipewire-pulse`) serves as well.
 
 ## Features
 
@@ -47,7 +48,7 @@ signals.
 - **Launch on startup** — starts minimized in the tray after login and can be disabled in Settings.
 - **Dark mode** — follows the desktop's dark/light preference (also on Cinnamon and GNOME with Qt 6 versions that do not do it by themselves) and switches live.
 - **Device information** — shows selectable device details and a one-click copy button for the Bluetooth MAC address.
-- **Sound output indicator** — a speaker next to the connected device shows whether the system sound actually plays through it; if it does not, one click makes it the default output.
+- **Sound output indicator** — a green speaker next to the connected device shows that the system sound actually plays through it; if it does not, a **Play here** button makes it the default output in one click (switching it out of a silent profile such as *Off* if needed).
 - **Audio profile switching** — pick the A2DP codec (SBC, SBC-XQ, AAC, LDAC, … as offered by the sound server) or the headset (HSP/HFP) mode from the device menu; each profile is tagged *Best*, *Medium* or *Low quality*.
 
 ## Supported desktops
@@ -177,8 +178,9 @@ If Qt 6 is installed outside the default search path, point CMake at it with
 - Left-click the tray icon, or choose **Settings**, to open the device list.
 - Click a device to connect. New devices are paired, trusted and connected automatically.
 - Use the device actions menu to view device information, copy its MAC address, switch the audio profile, disconnect or forget it.
-- A green speaker next to the connected device means the system sound plays through it; a grey crossed-out one means it plays elsewhere — click it to switch the sound to the device.
+- A green speaker next to the connected device means the system sound plays through it. If the sound goes elsewhere (or the device is on the *Off* profile), a **Play here** button appears instead — click it to switch the sound to the device.
 - Use **Refresh** to restart Bluetooth discovery.
+- Use **Reset adapter** to power-cycle the Bluetooth adapter, e.g. when multipoint earbuds stay stuck on another device.
 - Toggle **Launch on startup** to control autostart.
 - Choose **Quit** from the tray menu to exit completely.
 

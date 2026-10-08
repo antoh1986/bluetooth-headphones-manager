@@ -268,16 +268,30 @@ QWidget *SettingsWindow::makeOutputIndicator(const BtDevice &d, QWidget *row)
         return here;
     }
 
-    const QString current = m_audio->defaultOutputName();
+    // Elsewhere: another default output, or this device's active profile has
+    // no output (e.g. "Off").
+    QString why;
+    const QString active = m_audio->activeProfile(d.address);
+    for (const AudioProfile &p : m_audio->profiles(d.address)) {
+        if (p.name == active && !p.hasOutput)
+            why = tr("The audio profile \"%1\" has no sound output.").arg(p.description);
+    }
+    if (why.isEmpty()) {
+        const QString current = m_audio->defaultOutputName();
+        why = current.isEmpty() ? tr("System sound is not playing through this device.")
+                                : tr("System sound is playing through %1.").arg(current);
+    }
+
+    // A framed button with a label, so it reads as an action rather than a
+    // status icon like the green speaker.
     auto *route = new QToolButton(row);
     route->setIcon(Icons::output(false));
-    route->setIconSize(QSize(22, 22));
-    route->setAutoRaise(true);
-    route->setFixedSize(30, 30);
-    route->setToolTip(
-        (current.isEmpty() ? tr("System sound is not playing through this device.")
-                           : tr("System sound is playing through %1.").arg(current)) +
-        QLatin1Char('\n') + tr("Click to play it through %1.").arg(d.displayName()));
+    route->setIconSize(QSize(18, 18));
+    route->setText(tr("Play here"));
+    route->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    route->setCursor(Qt::PointingHandCursor);
+    route->setToolTip(why + QLatin1Char('\n') +
+                      tr("Click to play it through %1.").arg(d.displayName()));
     route->setAccessibleName(tr("Play sound through %1").arg(d.displayName()));
     connect(route, &QToolButton::clicked, this,
             [this, address = d.address]() { m_audio->routeOutputTo(address); });
